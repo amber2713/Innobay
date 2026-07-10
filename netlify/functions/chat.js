@@ -1,12 +1,8 @@
-const { OpenAI } = require("openai");
-
-// 初始化讯飞星辰客户端
-const client = new OpenAI({
-    apiKey: process.env.API_KEY,
-    baseURL: process.env.API_BASE
-});
-
 exports.handler = async (event) => {
+    let apiKey = null;
+    let apiBase = null;
+    let modelId = null;
+
     // 1. 处理跨域预检请求
     if (event.httpMethod === "OPTIONS") {
         return {
@@ -16,6 +12,25 @@ exports.handler = async (event) => {
                 "Access-Control-Allow-Headers": "Content-Type",
                 "Access-Control-Allow-Methods": "POST, OPTIONS"
             }
+        };
+    }
+
+    try {
+        apiKey = process.env.API_KEY || process.env.OPENAI_API_KEY || process.env.XUNFEI_API_KEY || process.env.SPARK_API_KEY;
+        apiBase = process.env.API_BASE || process.env.OPENAI_BASE_URL || process.env.XUNFEI_API_BASE || process.env.XUNFEI_BASE_URL || process.env.SPARK_API_BASE;
+        modelId = process.env.MODEL_ID || process.env.OPENAI_MODEL || process.env.XUNFEI_MODEL_ID || process.env.SPARK_MODEL_ID;
+
+        if (!apiKey || !apiBase || !modelId) {
+            throw new Error("AI 配置不完整，请在 Netlify 环境变量中设置 API_KEY/OPENAI_API_KEY/XUNFEI_API_KEY、API_BASE/OPENAI_BASE_URL/XUNFEI_API_BASE 和 MODEL_ID/OPENAI_MODEL/XUNFEI_MODEL_ID。")
+        }
+    } catch (err) {
+        return {
+            statusCode: 500,
+            headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*"
+            },
+            body: JSON.stringify({ error: err.message })
         };
     }
 
@@ -66,12 +81,31 @@ exports.handler = async (event) => {
         }
 
         // 3. 呼叫大模型
-        const completion = await client.chat.completions.create({
-            model: process.env.MODEL_ID,
-            messages: finalMessages,
-            temperature: 0.7,
-            max_tokens: 2048
+        const endpoint = apiBase.includes('/chat/completions')
+            ? apiBase
+            : `${apiBase.replace(/\/$/, '')}/chat/completions`;
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: modelId,
+                messages: finalMessages,
+                temperature: 0.7,
+                max_tokens: 2048
+            })
         });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error?.message || data.error || `AI 服务返回异常，状态码: ${response.status}`);
+        }
+
+        const aiContent = data.choices?.[0]?.message?.content || data.content || '';
 
         return {
             statusCode: 200,
@@ -80,7 +114,7 @@ exports.handler = async (event) => {
                 "Access-Control-Allow-Origin": "*" 
             },
             body: JSON.stringify({
-                content: completion.choices[0].message.content
+                content: aiContent
             })
         };
 
