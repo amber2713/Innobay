@@ -277,10 +277,17 @@ if (btnSyncChat) {
             chatSyncTip.className = "bg-purple-950/40 border border-purple-500/30 px-4 py-3 rounded-xl text-xs text-purple-300 font-mono leading-relaxed";
             chatSyncTip.innerHTML = `[同步成功] 已锁定当前1Hz均值体征包传入AI上下文中：<br>力量: ${payload.strength}N | 疲劳: ${payload.fatigue}% | 兴奋: ${payload.excitement}% | 维度: ${payload.size}cm。<br>模型已被激活，请在下方自由追问。`;
             
-            // 压入系统级提示词，确保星火大模型在自由对话里知道这些同步过来的肌肉平均数据
+            // 【已修复】将 role 从 "system" 改为 "user"，防止讯飞星火引擎报 Bad Request
             chatHistory.push({
-                role: "system",
-                content: `用户刚才主动同步了当前的平均肌肉生理特征包：力量为 ${payload.strength} N，疲劳度为 ${payload.fatigue}%，兴奋度为 ${payload.excitement}%，肌肉围度为 ${payload.size} cm。请在接下来的问答中，以此数据作为他的身体背景知识，专业、科学、合理地回答他的训练疑问。`
+                role: "user",
+                content: `【系统自动提示：以下是我的当前身体背景数据】
+我刚才通过硬件同步了最新的平均肌肉生理特征包：力量为 ${payload.strength} N，疲劳度为 ${payload.fatigue}%，兴奋度为 ${payload.excitement}%，肌肉围度为 ${payload.size} cm。请记住这些数据作为接下来的健康背景，并在回答我后续的问题时结合这些指标进行分析。`
+            });
+
+            // 紧接着让 AI 假装回复一句收到，让上下文逻辑更顺畅
+            chatHistory.push({
+                role: "assistant",
+                content: `【系统核心注入成功】我已经成功锁定你当前的体征包。力量：${payload.strength}N，疲劳度：${payload.fatigue}%。请问有什么我可以帮你的？`
             });
         });
     });
