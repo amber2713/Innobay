@@ -8,7 +8,7 @@
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
-        /* 1Hz 独立均值图表容器 */
+        /* 1Hz 图表容器 */
         .wave-container { height: 80px; display: flex; align-items: flex-end; gap: 3px; }
     </style>
 </head>
@@ -54,13 +54,13 @@
                 <button id="btn-goto-metrics" class="w-full p-5 text-left bg-slate-900 border border-slate-800 rounded-2xl hover:border-cyan-500/50 transition-all cursor-pointer group">
                     <span class="text-xs font-mono text-cyan-400 block mb-1">SCENE_01 // VISUAL PANEL</span>
                     <h3 class="text-lg font-semibold text-slate-200 group-hover:text-cyan-400 transition-colors">进入 1Hz 均值多轨数据流大屏</h3>
-                    <p class="text-sm text-slate-400 mt-1">每个肌肉特征板块内部独立包含专属它的数据流波动图。在电脑端并排网格显示，手机端自动适配为竖向单列顺次排列。</p>
+                    <p class="text-sm text-slate-400 mt-1">电脑端网格并行，手机端竖排顺次排列。每个生理维度配备专属平均值图表。</p>
                 </button>
 
                 <button id="btn-goto-chat" class="w-full p-5 text-left bg-slate-900 border border-slate-800 rounded-2xl hover:border-purple-500/50 transition-all cursor-pointer group">
                     <span class="text-xs font-mono text-purple-400 block mb-1">SCENE_02 // AI COACH</span>
                     <h3 class="text-lg font-semibold text-slate-200 group-hover:text-purple-400 transition-colors">进入 AI 智能私教自由对话舱</h3>
-                    <p class="text-sm text-slate-400 mt-1">完全隐藏复杂波形图表，可随时同步传输硬件特征至云端，与星火大模型直接进行自由沟通。</p>
+                    <p class="text-sm text-slate-400 mt-1">完全隐藏复杂波形图，基于同步传输进云端的硬件特征数据，与星火大模型自由沟通。</p>
                 </button>
             </div>
         </section>
@@ -80,7 +80,7 @@
                         <span class="font-mono text-2xl font-bold text-cyan-400"><span id="stream-val-strength">0.0</span> <span class="text-xs text-slate-500">N</span></span>
                     </div>
                     <div class="wave-container" id="container-wave-strength"></div>
-                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                    <div class="text-right text-[11px] font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
                 </div>
 
                 <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -89,7 +89,7 @@
                         <span class="font-mono text-2xl font-bold text-emerald-400"><span id="stream-val-fatigue">0.0</span> <span class="text-xs text-slate-500">%</span></span>
                     </div>
                     <div class="wave-container" id="container-wave-fatigue"></div>
-                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                    <div class="text-right text-[11px] font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
                 </div>
 
                 <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -98,7 +98,7 @@
                         <span class="font-mono text-2xl font-bold text-amber-400"><span id="stream-val-excitement">0.0</span> <span class="text-xs text-slate-500">%</span></span>
                     </div>
                     <div class="wave-container" id="container-wave-excitement"></div>
-                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                    <div class="text-right text-[11px] font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
                 </div>
 
                 <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -107,14 +107,14 @@
                         <span class="font-mono text-2xl font-bold text-purple-400"><span id="stream-val-size">0.0</span> <span class="text-xs text-slate-500">cm</span></span>
                     </div>
                     <div class="wave-container" id="container-wave-size"></div>
-                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                    <div class="text-right text-[11px] font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
                 </div>
             </div>
 
-            <div id="panel-metrics-ai" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2 hidden">
+            <div id="panel-metrics-ai" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2 hidden animate-fade-in">
                 <div class="text-sm font-mono text-purple-400 font-bold border-b border-slate-800 pb-2 flex items-center space-x-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-                    <span>星火即时体征处方建议：</span>
+                    <span>讯飞星辰 AI 运动处方反馈：</span>
                 </div>
                 <div id="metrics-ai-content" class="text-slate-200 leading-relaxed text-sm max-h-60 overflow-y-auto custom-scrollbar"></div>
             </div>
@@ -124,12 +124,12 @@
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <button class="back-to-hub text-sm text-slate-400 hover:text-cyan-400 font-mono transition-colors">&larr; 返回控制中心</button>
                 <button id="btn-sync-data-chat" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono transition-all cursor-pointer">
-                    传输肌肉信息
+                    同步当前体征平均包
                 </button>
             </div>
 
             <div id="chat-sync-tip" class="bg-slate-900/60 border border-slate-800/60 px-4 py-3 rounded-xl text-xs text-slate-400 font-mono leading-relaxed">
-                [SYSTEM]: 暂未点击右上角同步生理数据。你可以直接往下对话，或点击上方“传输肌肉信息”获取设备的硬件特征包。
+                [SYSTEM]: 暂未注入生理数据。可以直接对话，或点击上方按钮将实时均值包锁定同步给 AI 教练。
             </div>
 
             <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 text-sm">
@@ -139,7 +139,7 @@
             </div>
 
             <div class="flex space-x-2">
-                <input id="chat-input" type="text" placeholder="向 AI 智能教练提问..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500 text-slate-200">
+                <input id="chat-input" type="text" placeholder="键入问题... (例如：今天测出的疲劳度偏高，该怎么调整？)" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500 text-slate-200">
                 <button id="chat-send-btn" class="px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium transition-all cursor-pointer">发送</button>
             </div>
         </section>
