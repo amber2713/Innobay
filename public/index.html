@@ -3,124 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>体征与运动数据监测系统 // DATA STREAM</title>
+    <title>体征与运动数据监测系统</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="style.css">
     <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+        /* 强制手机竖屏视图美化 */
+        body { max-width: 480px; margin: 0 auto; }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+        .wave-container { height: 60px; display: flex; align-items: flex-end; gap: 2px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-900">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans border-x border-slate-900 selection:bg-cyan-500 selection:text-slate-900">
 
-    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-3">
-            <div class="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_10px_#06b6d4]"></div>
-            <span class="font-mono tracking-wider text-sm text-slate-400">BIOMONITOR // MULTI_STREAM_v2.5</span>
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_8px_#06b6d4]"></div>
+            <span class="font-mono tracking-wider text-xs text-slate-400">SAKURA_CORE // 10Hz</span>
         </div>
-        <div id="connection-status" class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-full text-rose-400 border border-rose-500/30">
-            ● 未连接设备
+        <div id="connection-status" class="text-[10px] font-mono bg-slate-800 px-2.5 py-0.5 rounded-full text-rose-400 border border-rose-500/30">
+            ● 未连接
         </div>
     </header>
 
-    <main class="flex-1 flex flex-col items-center justify-center p-4 max-w-6xl mx-auto w-full">
+    <main class="flex-1 p-4 flex flex-col justify-center">
         
-        <section id="step-1" class="w-full max-w-md text-center space-y-8 py-12">
-            <div class="relative w-40 h-40 mx-auto flex items-center justify-center">
-                <div class="absolute inset-0 rounded-full bg-cyan-500/10 border border-cyan-500/30 radar-wave"></div>
-                <div class="absolute inset-4 rounded-full bg-cyan-950 border border-cyan-500/40 flex items-center justify-center">
-                    <svg class="w-10 h-10 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <section id="step-1" class="w-full text-center space-y-8 py-8">
+            <div class="relative w-36 h-36 mx-auto flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full bg-cyan-500/10 border border-cyan-500/30 radar-wave animate-pulse"></div>
+                <div class="absolute inset-4 rounded-full bg-slate-900 border border-cyan-500/30 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M7.53 14.53a6 6 0 018.94 0M13 11a1 1 0 11-2 0 1 1 0 012 0zm7 2.121C19.23 6.512 15.742 3 12 3c-3.743 0-7.23 3.512-8 10.121"></path>
                     </svg>
                 </div>
             </div>
-            <div class="space-y-2">
-                <h2 class="text-lg font-medium text-cyan-400">正在扫描周围肌电蓝牙外设...</h2>
-                <p class="text-xs text-slate-500 font-mono" id="search-loader">WAITING SIGNAL...</p>
+            <div class="space-y-1">
+                <h2 class="text-md font-medium text-cyan-400">正在搜索外设硬件...</h2>
+                <p class="text-[11px] text-slate-500 font-mono" id="search-loader">WAITING...</p>
             </div>
-            <button id="connect-btn" class="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-medium rounded-lg text-sm transition-all cursor-pointer">
-                模拟握手连接硬件
+            <button id="connect-btn" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold rounded-xl tracking-widest cursor-pointer">
+                建立 BLE 蓝牙物理连接
             </button>
         </section>
 
-        <section id="step-2" class="hidden w-full max-w-md space-y-6 py-8">
-            <div class="text-center space-y-1">
-                <h2 class="text-xl font-semibold">数据同步总线已就绪</h2>
-                <p class="text-slate-400 text-xs">请点击下方按钮载入核心监测大屏</p>
+        <section id="step-2" class="hidden w-full space-y-4 py-4 animate-fade-in">
+            <div class="text-center pb-2">
+                <h2 class="text-base font-semibold">总线通信已建立</h2>
+                <p class="text-slate-400 text-[11px]">请选择您需要进入的专属控制台场景</p>
             </div>
-            <button id="btn-go-metrics" class="w-full p-6 text-left bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-xl transition-all cursor-pointer hover:shadow-xl hover:shadow-cyan-950/20 group">
-                <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-mono text-cyan-400">METRICS STREAM // ACTIVE</span>
-                    <span class="text-[10px] text-slate-500 font-mono">CH_ALL</span>
-                </div>
-                <h3 class="text-md font-medium text-slate-200 group-hover:text-cyan-400 transition-colors">进入多模态实时数据看板</h3>
-                <p class="text-xs text-slate-400 mt-1">同步加载肌肉大小、力量输出、兴奋度及疲劳指标流。</p>
+            
+            <button id="btn-goto-metrics" class="w-full p-4 text-left bg-slate-900 border border-slate-800 rounded-xl hover:border-cyan-500/40 transition-all cursor-pointer">
+                <span class="text-[10px] font-mono text-cyan-400 block mb-1">SCENE // 01</span>
+                <h3 class="text-sm font-medium text-slate-200">10Hz 多轨高频实时数据流</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">每种肌肉指标配备独立动态波形序列，专供数据追踪。</p>
+            </button>
+
+            <button id="btn-goto-chat" class="w-full p-4 text-left bg-slate-900 border border-slate-800 rounded-xl hover:border-purple-500/40 transition-all cursor-pointer">
+                <span class="text-[10px] font-mono text-purple-400 block mb-1">SCENE // 02</span>
+                <h3 class="text-sm font-medium text-slate-200">AI 智能教练自由答疑舱</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">不显示图表，基于同步的特征值与星火大模型交流。</p>
             </button>
         </section>
 
-        <section id="step-3" class="hidden w-full space-y-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-3">
-                <div>
-                    <button id="back-btn" class="text-xs font-mono text-slate-500 hover:text-cyan-400 flex items-center space-x-1 cursor-pointer">
-                        <span>&larr; 返回控制中心</span>
-                    </button>
-                    <h2 class="text-lg font-bold mt-1">肌肉生理模态实时采样大屏</h2>
-                </div>
-                <button id="btn-trigger-ai" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-medium rounded-lg text-xs tracking-wider cursor-pointer shadow-lg">
-                    ✦ 诊断：发送当前数据包至星火AI
+        <section id="step-3-metrics" class="hidden w-full space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <button class="back-to-hub text-[11px] text-slate-500 font-mono">&larr; 控制中心</button>
+                <button id="btn-sync-data-metrics" class="px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-purple-600 text-white rounded-lg text-[10px] font-mono tracking-wider">
+                    ✦ 传输肌肉信息至AI
                 </button>
             </div>
 
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                    <div class="text-xs text-slate-400 font-mono">① 肌肉力量 (Strength)</div>
-                    <div class="flex items-baseline space-x-1 mt-2">
-                        <span id="val-strength" class="text-3xl font-mono font-bold text-cyan-400">0.0</span>
-                        <span class="text-[10px] text-slate-500 font-mono">N</span>
+            <div class="space-y-3">
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center text-[11px]">
+                        <span class="text-slate-300 font-medium">① 肌肉力量 (Strength)</span>
+                        <span class="font-mono text-cyan-400 font-bold"><span id="stream-val-strength">0.0</span> N</span>
                     </div>
+                    <div class="wave-container" id="container-wave-strength"></div>
                 </div>
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                    <div class="text-xs text-slate-400 font-mono">② 疲劳度 (Fatigue)</div>
-                    <div class="flex items-baseline space-x-1 mt-2">
-                        <span id="val-fatigue" class="text-3xl font-mono font-bold text-emerald-400">0.0</span>
-                        <span class="text-[10px] text-slate-500 font-mono">%</span>
+
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center text-[11px]">
+                        <span class="text-slate-300 font-medium">② 肌肉疲劳度 (Fatigue)</span>
+                        <span class="font-mono text-emerald-400 font-bold"><span id="stream-val-fatigue">0.0</span> %</span>
                     </div>
+                    <div class="wave-container" id="container-wave-fatigue"></div>
                 </div>
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                    <div class="text-xs text-slate-400 font-mono">③ 兴奋程度 (Excitement)</div>
-                    <div class="flex items-baseline space-x-1 mt-2">
-                        <span id="val-excitement" class="text-3xl font-mono font-bold text-amber-400">0.0</span>
-                        <span class="text-[10px] text-slate-500 font-mono">%</span>
+
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center text-[11px]">
+                        <span class="text-slate-300 font-medium">③ 兴奋程度 (Excitement)</span>
+                        <span class="font-mono text-amber-400 font-bold"><span id="stream-val-excitement">0.0</span> %</span>
                     </div>
+                    <div class="wave-container" id="container-wave-excitement"></div>
                 </div>
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                    <div class="text-xs text-slate-400 font-mono">④ 围度估算 (Size)</div>
-                    <div class="flex items-baseline space-x-1 mt-2">
-                        <span id="val-size" class="text-3xl font-mono font-bold text-purple-400">38.5</span>
-                        <span class="text-[10px] text-slate-500 font-mono">cm</span>
+
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex justify-between items-center text-[11px]">
+                        <span class="text-slate-300 font-medium">④ 肌肉大小/围度 (Size)</span>
+                        <span class="font-mono text-purple-400 font-bold"><span id="stream-val-size">0.0</span> cm</span>
                     </div>
+                    <div class="wave-container" id="container-wave-size"></div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-4">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-mono text-slate-400">实时多轨生理波形序列 (每一帧连续流)</span>
-                        <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-cyan-400 font-mono animate-pulse">● 100Hz Realtime Feed</span>
-                    </div>
-                    <div class="h-44 flex items-end justify-between gap-1.5 pt-4 border-b border-slate-800" id="chart-bars-container">
-                        </div>
-                </div>
+            <div id="panel-metrics-ai" class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs hidden">
+                <div class="text-[10px] font-mono text-purple-400 border-b border-slate-800 pb-1 mb-1.5">✦ 星火即时体征处方:</div>
+                <div id="metrics-ai-content" class="text-slate-300 leading-relaxed text-[11px] max-h-32 overflow-y-auto custom-scrollbar"></div>
+            </div>
+        </section>
 
-                <div class="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col h-[242px] lg:h-auto">
-                    <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 mb-3">
-                        <div class="w-2 h-2 rounded-full bg-purple-400"></div>
-                        <h3 class="text-sm font-semibold text-slate-200">星火大模型运动处方</h3>
-                    </div>
-                    <div id="ai-advice-container" class="flex-1 overflow-y-auto custom-scrollbar text-xs leading-relaxed text-slate-400 space-y-2 pr-1">
-                        <p class="text-slate-500 italic">等待数据注入... 请点击右上角“发送当前数据包至星火AI”生成诊断报告。</p>
-                    </div>
+        <section id="step-4-chat" class="hidden w-full flex flex-col h-[80vh] space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <button class="back-to-hub text-[11px] text-slate-500 font-mono">&larr; 控制中心</button>
+                <button id="btn-sync-data-chat" class="px-2.5 py-1 bg-slate-800 text-slate-300 rounded-lg text-[10px] font-mono hover:bg-slate-700">
+                    同步当前体征包
+                </button>
+            </div>
+
+            <div id="chat-sync-tip" class="bg-slate-900/60 border border-slate-800/80 px-3 py-2 rounded-lg text-[10px] text-slate-400 font-mono">
+                [系统状态]：暂未同步当前物理指标至AI。你可以直接提问，或点击上方同步。
+            </div>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 text-[11px]">
+                <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-800 max-w-[90%]">
+                    <span class="text-purple-400 font-bold">COACH AI:</span> 欢迎进入星火智能私教舱。我已就绪，关于科学训练、周期安排或刚才采集的身体数据，随时向我提问。
                 </div>
+            </div>
+
+            <div class="flex space-x-1.5 pt-1">
+                <input id="chat-input" type="text" placeholder="向AI提问..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-500 text-slate-200">
+                <button id="chat-send-btn" class="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-medium">发送</button>
             </div>
         </section>
 
