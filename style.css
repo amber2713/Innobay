@@ -1,0 +1,19 @@
+/* 雷达呼吸灯与扩散动画自定义 */
+@keyframes radar-pulse {
+    0% { transform: scale(0.6); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+}
+
+.radar-wave {
+    animation: radar-pulse 2s infinite linear;
+}
+
+/* 页面切换淡入动画 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
