@@ -96,6 +96,7 @@ if (btnTriggerAi) {
 
         try {
             // Netlify Functions 的本地/线上相对调用路径为 /.netlify/functions/函数名
+            // 对应前端修改后的分析数据部分 (style.js 约第 82 行)
             const response = await fetch("/.netlify/functions/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -104,13 +105,12 @@ if (btnTriggerAi) {
                     payload: payloadData
                 })
             });
-
             const data = await response.json();
             if (data.error) {
                 aiAdviceContainer.innerHTML = `<p class="text-rose-400">分析失败: ${data.error}</p>`;
             } else {
-                // 将换行格式转换为 HTML
-                aiAdviceContainer.innerHTML = `<div class="space-y-2 text-slate-200">${data.result.replace(/\n/g, '<br>')}</div>`;
+                // 这里改用 data.content 来读取
+                aiAdviceContainer.innerHTML = `<div class="space-y-2 text-slate-200">${data.content.replace(/\n/g, '<br>')}</div>`;
             }
         } catch (err) {
             aiAdviceContainer.innerHTML = `<p class="text-rose-400">连接 Functions 失败，请检查部署状态。</p>`;
@@ -144,17 +144,25 @@ async function handleUserChat() {
     const thinkingId = appendChatMessage("COACH AI", "正在思考中...", "text-purple-400 animate-pulse");
 
     try {
-        const response = await fetch("/.netlify/functions/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                type: "free_chat",
-                payload: { messages: chatHistory }
-            })
-        });
-
-        const data = await response.json();
-        
+        // 对应前端自由问答部分 (style.js 约第 127 行)
+            const response = await fetch("/.netlify/functions/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "free_chat",
+                    messages: chatHistory // 字段名对齐你后端解构的 messages
+                })
+            });
+            const data = await response.json();
+            
+            // 移除思考状态后...
+            if (data.error) {
+                appendChatMessage("SYSTEM ERROR", data.error, "text-rose-400");
+            } else {
+                // 这里同样改用 data.content 来读取
+                appendChatMessage("COACH AI", data.content, "text-purple-400");
+                chatHistory.push({ role: "assistant", content: data.content });
+            }
         // 移除思考占位符
         const deleteTarget = document.getElementById(thinkingId);
         if (deleteTarget) deleteTarget.remove();
