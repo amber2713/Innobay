@@ -1,99 +1,124 @@
 // public/style.js
 
-// 1. 状态机轮询系统：严格遵循原版对应的状态切换
+// 1. 状态机轮询系统：严格遵循网页打开/刷新顺序
 const LEVER_STATES = ['high_fatigue', 'low_fatigue', 'mid_fatigue'];
 let globalStatePointer = localStorage.getItem('biomonitor_pointer') 
     ? parseInt(localStorage.getItem('biomonitor_pointer')) : 0;
 
 let currentCycleMode = LEVER_STATES[globalStatePointer];
-console.log(`[状态机激活] 序列号: ${globalStatePointer} | 锁定数据模式: ${currentCycleMode}`);
+console.log(`[状态机激活] 打开序列号: ${globalStatePointer} | 目标分析锁定模式: ${currentCycleMode}`);
+
+// 锁定下次打开的状态指针进行循环
 localStorage.setItem('biomonitor_pointer', (globalStatePointer + 1) % 3);
 
 let currentStep = 1;
-let hardwareTimer = null; // 核心采样定时器
+let samplingTimer = null; // 10Hz 高频物理采样器
 
-// 1Hz 均值波形点存放队列 (维持原版 chart-bars-container 细腻的流动感)
-let waveDataQueue = Array(32).fill(0); 
+// 前端图表展示队列 (1Hz 均值波形点，存放 20 秒的历史跨度)
+let queueStrength = Array(20).fill(0);
+let queueFatigue = Array(20).fill(0);
+let queueExcitement = Array(20).fill(0);
+let queueSize = Array(20).fill(0);
 
-// 10Hz 高频物理采样临时缓冲区（存满 10 个算一次平均值，降低大模型接收空值的概率）
+// 10Hz 物理采样的高频临时缓冲区（每存满 10 个数据进行一次均值计算）
 let bufferStrength = [];
 let bufferFatigue = [];
 let bufferExcitement = [];
 let bufferSize = [];
 
-// DOM 获取 (严格与你发过来的原版 index 元素 ID 保持百分之百对齐)
+let chatHistory = []; 
+
+// DOM 获取
 const searchLoader = document.getElementById('search-loader');
 const connectionStatus = document.getElementById('connection-status');
 const connectBtn = document.getElementById('connect-btn');
-const btnGoMetrics = document.getElementById('btn-go-metrics');
-const backBtn = document.getElementById('back-btn');
-const btnTriggerAi = document.getElementById('btn-trigger-ai');
+const btnGotoMetrics = document.getElementById('btn-goto-metrics');
+const btnGotoChat = document.getElementById('btn-goto-chat');
+const backToHubBtns = document.querySelectorAll('.back-to-hub');
 
-const valStrength = document.getElementById('val-strength');
-const valFatigue = document.getElementById('val-fatigue');
-const valExcitement = document.getElementById('val-excitement');
-const valSize = document.getElementById('val-size');
-const aiAdviceContainer = document.getElementById('ai-advice-container');
-const chartBarsContainer = document.getElementById('chart-bars-container');
+const btnSyncMetrics = document.getElementById('btn-sync-data-metrics');
+const btnSyncChat = document.getElementById('btn-sync-data-chat');
+const chatSyncTip = document.getElementById('chat-sync-tip');
 
-// 1. 雷达扫描文本动画
+const streamValStrength = document.getElementById('stream-val-strength');
+const streamValFatigue = document.getElementById('stream-val-fatigue');
+const streamValExcitement = document.getElementById('stream-val-excitement');
+const streamValSize = document.getElementById('stream-val-size');
+
+const panelMetricsAi = document.getElementById('panel-metrics-ai');
+const metricsAiContent = document.getElementById('metrics-ai-content');
+
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatSendBtn = document.getElementById('chat-send-btn');
+
+// 统一保存当前通过 1Hz 计算出的最新有效均值数据，供随时同步给 AI
+let latestAveragedMetrics = { strength: 0, fatigue: 0, excitement: 0, size: 0 };
+
+// 扫描连击特效动画
 let dots = 0;
 setInterval(() => {
     if (currentStep === 1 && searchLoader) {
         dots = (dots + 1) % 4;
         searchLoader.innerText = `SCANNING${'.'.repeat(dots)}`;
     }
-}, 500);
+}, 400);
 
-// 2. 连接按钮事件
 if (connectBtn) {
     connectBtn.addEventListener('click', () => {
         connectBtn.disabled = true;
-        connectBtn.innerText = "正在建立安全通道...";
+        connectBtn.innerText = "物理通道对准中...";
         setTimeout(() => {
             if (connectionStatus) {
-                connectionStatus.innerText = "● 已连接: SAKURA_BLE_ARM";
-                connectionStatus.className = "text-xs font-mono bg-cyan-950/40 px-3 py-1 rounded-full text-cyan-400 border border-cyan-500/30";
+                connectionStatus.innerText = "● 链路就绪: SAKURA_BLE";
+                connectionStatus.className = "text-sm font-mono bg-cyan-950/40 px-3 py-1 rounded-full text-cyan-400 border border-cyan-500/30";
             }
             switchStep(2);
-        }, 1200);
+        }, 1000);
     });
 }
 
-// 路由控制
-if (btnGoMetrics) btnGoMetrics.addEventListener('click', () => { switchStep(3); startHardwareSim(); });
-if (backBtn) backBtn.addEventListener('click', () => switchStep(2));
+if (btnGotoMetrics) btnGotoMetrics.addEventListener('click', () => { switchStep(3); startDualSpeedDataEngine(); });
+if (btnGotoChat) btnGotoChat.addEventListener('click', () => { switchStep(4); clearInterval(samplingTimer); });
+
+backToHubBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchStep(2));
+});
 
 function switchStep(step) {
     currentStep = step;
     document.getElementById('step-1').classList.add('hidden');
     document.getElementById('step-2').classList.add('hidden');
-    document.getElementById('step-3').classList.add('hidden');
-    document.getElementById(`step-${step}`).classList.remove('hidden');
+    document.getElementById('step-3-metrics').classList.add('hidden');
+    document.getElementById('step-4-chat').classList.add('hidden');
+
+    if (step === 3) document.getElementById('step-3-metrics').classList.remove('hidden');
+    else if (step === 4) document.getElementById('step-4-chat').classList.remove('hidden');
+    else document.getElementById(`step-${step}`).classList.remove('hidden');
 
     if (step !== 3) {
-        clearInterval(hardwareTimer);
+        clearInterval(samplingTimer);
     }
 }
 
-// 模拟状态机基础底座
+// 根据要求的状态机模式，输出对应的参数模型
 function generateRawHardwareFrame() {
     switch(currentCycleMode) {
-        case 'high_fatigue':
+        case 'high_fatigue': // 1. 高疲劳度 -> 给出停止/休息建议
             return {
                 fatigue: 83 + Math.sin(Date.now() / 2000) * 4 + Math.random() * 2,
                 strength: 38 + Math.random() * 6,
                 excitement: 22 + Math.random() * 8,
                 size: 38.4
             };
-        case 'low_fatigue':
+        case 'low_fatigue':  // 2. 低疲劳度 -> 建议加大重量
             return {
                 fatigue: 16 + Math.sin(Date.now() / 3000) * 3 + Math.random() * 2,
                 strength: 148 + Math.random() * 12,
                 excitement: 91 + Math.random() * 5,
                 size: 39.1
             };
-        case 'mid_fatigue':
+        case 'mid_fatigue':  // 3. 中间疲劳度 -> 建议继续训练
         default:
             return {
                 fatigue: 49 + Math.sin(Date.now() / 4000) * 3 + Math.random() * 2,
@@ -104,128 +129,211 @@ function generateRawHardwareFrame() {
     }
 }
 
-// 3. 核心双速数据引擎：10Hz高频底层硬件流 ➔ 1Hz（10帧聚合）算术均值渲染展示
-function startHardwareSim() {
-    clearInterval(hardwareTimer);
+// 核心计算引擎：10Hz高频采样处理 + 1Hz算术平均沉淀展示
+function startDualSpeedDataEngine() {
+    clearInterval(samplingTimer);
     
-    // 初始化清空缓冲区
+    // 清空历史残余缓存
     bufferStrength = []; bufferFatigue = []; bufferExcitement = []; bufferSize = [];
 
-    // 设置初试占位字符，保障界面没有虚假空白
-    const initFrame = generateRawHardwareFrame();
-    if (valStrength) valStrength.innerText = initFrame.strength.toFixed(1);
-    if (valFatigue) valFatigue.innerText = initFrame.fatigue.toFixed(1);
-    if (valExcitement) valExcitement.innerText = initFrame.excitement.toFixed(1);
-    if (valSize) valSize.innerText = initFrame.size.toFixed(1);
-
-    // 100ms (10Hz) 高频连续捕捉原始波动数据
-    hardwareTimer = setInterval(() => {
+    // 100ms 定时器开启 (一秒内高频处理并吞噬 10 个物理数据包)
+    samplingTimer = setInterval(() => {
         const rawFrame = generateRawHardwareFrame();
 
+        // 压入临时数据高速缓冲区
         bufferStrength.push(rawFrame.strength);
         bufferFatigue.push(rawFrame.fatigue);
         bufferExcitement.push(rawFrame.excitement);
         bufferSize.push(rawFrame.size);
 
-        // 每攒满 10 帧数据（即经历了 1 整秒），融合并沉淀出平稳的均值更新到 DOM
+        // 当高速缓冲区攒满 10 个数据（即经历了一整秒），触发算术平均值融合
         if (bufferStrength.length >= 10) {
-            const avgStrength = bufferStrength.reduce((a, b) => a + b, 0) / bufferStrength.length;
-            const avgFatigue = bufferFatigue.reduce((a, b) => a + b, 0) / bufferFatigue.length;
-            const avgExcitement = bufferExcitement.reduce((a, b) => a + b, 0) / bufferExcitement.length;
-            const avgSize = bufferSize.reduce((a, b) => a + b, 0) / bufferSize.length;
+            
+            latestAveragedMetrics.strength = calcArrayAverage(bufferStrength);
+            latestAveragedMetrics.fatigue = calcArrayAverage(bufferFatigue);
+            latestAveragedMetrics.excitement = calcArrayAverage(bufferExcitement);
+            latestAveragedMetrics.size = calcArrayAverage(bufferSize);
 
-            // 渲染1秒均值到对应的原版节点上
-            if (valStrength) valStrength.innerText = avgStrength.toFixed(1);
-            if (valFatigue) valFatigue.innerText = avgFatigue.toFixed(1);
-            if (valExcitement) valExcitement.innerText = avgExcitement.toFixed(1);
-            if (valSize) valSize.innerText = avgSize.toFixed(1);
+            // 1. 刷新界面大字号文本数据
+            streamValStrength.innerText = latestAveragedMetrics.strength.toFixed(1);
+            streamValFatigue.innerText = latestAveragedMetrics.fatigue.toFixed(1);
+            streamValExcitement.innerText = latestAveragedMetrics.excitement.toFixed(1);
+            streamValSize.innerText = latestAveragedMetrics.size.toFixed(1);
 
-            // 计算图表波形需要的混合权重值并滚动队列
-            const frameMixValue = Math.max(10, avgStrength * 0.7 + avgExcitement * 0.3 - avgFatigue * 0.1);
-            waveDataQueue.push(frameMixValue);
-            waveDataQueue.shift();
+            // 2. 将计算出来的1秒均值压入前端滚动展示序列
+            pushAndShift(queueStrength, latestAveragedMetrics.strength);
+            pushAndShift(queueFatigue, latestAveragedMetrics.fatigue);
+            pushAndShift(queueExcitement, latestAveragedMetrics.excitement);
+            pushAndShift(queueSize, latestAveragedMetrics.size);
 
-            // 重新重绘下方的连续流图表
-            renderWaveBars();
+            // 3. 动态绘制每一个生理维度专属的 1Hz 独立滚动图表
+            renderSingleChart('container-wave-strength', queueStrength, 'bg-cyan-500');
+            renderSingleChart('container-wave-fatigue', queueFatigue, 'bg-emerald-500');
+            renderSingleChart('container-wave-excitement', queueExcitement, 'bg-amber-500');
+            renderSingleChart('container-wave-size', queueSize, 'bg-purple-500');
 
-            // 释放缓冲区
+            // 4. 重置高频物理缓冲区，等待下一秒的 10 个数据包
             bufferStrength = []; bufferFatigue = []; bufferExcitement = []; bufferSize = [];
         }
-    }, 100);
+
+    }, 100); // 100ms = 10Hz
 }
 
-// 4. 渲染波形柱动画
-function renderWaveBars() {
-    if (!chartBarsContainer) return;
-    chartBarsContainer.innerHTML = ''; 
-    
-    const maxInQueue = Math.max(...waveDataQueue, 1);
+function calcArrayAverage(arr) {
+    const sum = arr.reduce((acc, val) => acc + val, 0);
+    return sum / arr.length;
+}
 
-    waveDataQueue.forEach((val, idx) => {
-        const percent = (val / maxInQueue) * 100;
+function pushAndShift(queue, val) {
+    queue.push(val);
+    queue.shift();
+}
+
+// 独立波形数据流渲染器
+function renderSingleChart(containerId, dataQueue, colorClass) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+
+    const max = Math.max(...dataQueue, 1);
+    const min = Math.min(...dataQueue, 0) * 0.95; 
+
+    dataQueue.forEach((val, i) => {
+        const heightPercent = max === min ? 50 : ((val - min) / (max - min)) * 85 + 15;
         const bar = document.createElement('div');
+        bar.style.height = `${heightPercent}%`;
         
-        const opacityRatio = (idx + 1) / waveDataQueue.length; 
-        
-        bar.className = 'flex-1 bg-cyan-500 rounded-t transition-all duration-150';
-        bar.style.height = `${Math.max(percent, 4)}%`;
-        bar.style.opacity = opacityRatio;
+        // 数据流向左滚动的渐亮淡出视觉
+        const alpha = (i + 1) / dataQueue.length;
+        bar.className = `flex-1 ${colorClass} rounded-t transition-all duration-300`;
+        bar.style.opacity = alpha;
 
-        if (idx === waveDataQueue.length - 1) {
-            bar.className = 'flex-1 bg-cyan-400 rounded-t transition-all duration-150 shadow-[0_0_12px_#22d3ee]';
+        if (i === dataQueue.length - 1) {
+            bar.classList.add('shadow-[0_0_10px_rgba(255,255,255,0.5)]');
         }
-
-        chartBarsContainer.appendChild(bar);
+        container.appendChild(bar);
     });
 }
 
-// 5. 核心诊断事件：采用原本经测试绝对安全的 innerText 读取对接模式
-if (btnTriggerAi) {
-    btnTriggerAi.addEventListener('click', async () => {
-        btnTriggerAi.disabled = true;
-        const originalText = btnTriggerAi.innerText;
-        btnTriggerAi.innerText = "✦ 正在打包数据并请求星火诊断...";
-        aiAdviceContainer.innerHTML = `<p class="text-cyan-400 font-mono animate-pulse">正在截取当前帧体征特征，调用云端接口...</p>`;
+// 发起大模型接口诊断调用
+async function executeAiRequest(triggerBtn, outputContainer, callbackSuccess = null) {
+    triggerBtn.disabled = true;
+    const oldText = triggerBtn.innerText;
+    triggerBtn.innerText = "同步打包中...";
 
-        // 终极安全抓取：双重判断防御机制，如果节点内容由于加载未完全显示，提供默认合法值，完全断绝 500 后端死机的可能
-        let s = valStrength ? valStrength.innerText : "90.0";
-        let f = valFatigue ? valFatigue.innerText : "50.0";
-        let e = valExcitement ? valExcitement.innerText : "65.0";
-        let z = valSize ? valSize.innerText : "38.5";
+    // 随时抓取最新的 1Hz 有效均值包
+    const payloadData = {
+        size: latestAveragedMetrics.size > 0 ? latestAveragedMetrics.size.toFixed(1) : "38.5",
+        fatigue: latestAveragedMetrics.fatigue > 0 ? latestAveragedMetrics.fatigue.toFixed(1) : "50.0",
+        excitement: latestAveragedMetrics.excitement > 0 ? latestAveragedMetrics.excitement.toFixed(1) : "65.0",
+        strength: latestAveragedMetrics.strength > 0 ? latestAveragedMetrics.strength.toFixed(1) : "90.0"
+    };
 
-        if (s === "0.0" || !s) {
-            const fallback = generateRawHardwareFrame();
-            s = fallback.strength.toFixed(1);
-            f = fallback.fatigue.toFixed(1);
-            e = fallback.excitement.toFixed(1);
-            z = fallback.size.toFixed(1);
+    outputContainer.innerHTML = `<span class="text-cyan-400 font-mono animate-pulse">正在提取均值包，调用讯飞星辰大模型诊断端点...</span>`;
+
+    try {
+        const response = await fetch("/.netlify/functions/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "analyze_muscle",
+                payload: payloadData
+            })
+        });
+        const data = await response.json();
+        if (data.error) {
+            outputContainer.innerHTML = `<span class="text-rose-400">调用失败: ${data.error}</span>`;
+        } else {
+            // 对齐旧项目的 data.content 字段进行渲染
+            outputContainer.innerHTML = data.content.replace(/\n/g, '<br>');
+            if (callbackSuccess) callbackSuccess(payloadData);
         }
+    } catch (err) {
+        outputContainer.innerHTML = `<span class="text-rose-400">网络故障，请确保 Netlify Functions 正常运行。</span>`;
+    } finally {
+        triggerBtn.disabled = false;
+        triggerBtn.innerText = oldText;
+    }
+}
 
-        const payloadData = { size: z, fatigue: f, excitement: e, strength: s };
-
-        try {
-            const response = await fetch("/.netlify/functions/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    type: "analyze_muscle",
-                    payload: payloadData
-                })
-            });
-
-            const data = await response.json();
-            if (data.error) {
-                aiAdviceContainer.innerHTML = `<p class="text-rose-400">分析失败: ${data.error}</p>`;
-            } else if (data.content) {
-                aiAdviceContainer.innerHTML = `<div class="space-y-2 text-slate-200 leading-relaxed">${data.content.replace(/\n/g, '<br>')}</div>`;
-            } else {
-                aiAdviceContainer.innerHTML = `<p class="text-rose-400">未收到合法回答，请检查云端函数日志</p>`;
-            }
-        } catch (err) {
-            aiAdviceContainer.innerHTML = `<p class="text-rose-400">连接后台微服务失败，请检查本地配置。</p>`;
-        } finally {
-            btnTriggerAi.disabled = false;
-            btnTriggerAi.innerText = originalText;
-        }
+// 看数据大屏界面 -> 触发AI诊断
+if (btnSyncMetrics) {
+    btnSyncMetrics.addEventListener('click', () => {
+        panelMetricsAi.classList.remove('hidden');
+        executeAiRequest(btnSyncMetrics, metricsAiContent);
     });
+}
+
+// 独立问答界面 -> 点击同步肌肉信息
+if (btnSyncChat) {
+    btnSyncChat.addEventListener('click', () => {
+        // 如果是从控制中心直接进入的问答，还没有跑起大屏引擎，就手动生成一个与之状态对应的静态特征包
+        if (latestAveragedMetrics.strength === 0) {
+            const staticFrame = generateRawHardwareFrame();
+            latestAveragedMetrics = staticFrame;
+        }
+
+        executeAiRequest(btnSyncChat, chatSyncTip, (payload) => {
+            chatSyncTip.className = "bg-purple-950/40 border border-purple-500/30 px-4 py-3 rounded-xl text-xs text-purple-300 font-mono leading-relaxed";
+            chatSyncTip.innerHTML = `[同步成功] 已锁定当前1Hz均值体征包传入AI上下文中：<br>力量: ${payload.strength}N | 疲劳: ${payload.fatigue}% | 兴奋: ${payload.excitement}% | 维度: ${payload.size}cm。<br>模型已被激活，请在下方自由追问。`;
+            
+            // 压入系统级提示词，确保星火大模型在自由对话里知道这些同步过来的肌肉平均数据
+            chatHistory.push({
+                role: "system",
+                content: `用户刚才主动同步了当前的平均肌肉生理特征包：力量为 ${payload.strength} N，疲劳度为 ${payload.fatigue}%，兴奋度为 ${payload.excitement}%，肌肉围度为 ${payload.size} cm。请在接下来的问答中，以此数据作为他的身体背景知识，专业、科学、合理地回答他的训练疑问。`
+            });
+        });
+    });
+}
+
+// AI 交互舱自由会话逻辑
+if (chatSendBtn) chatSendBtn.addEventListener('click', processUserChat);
+if (chatInput) chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') processUserChat(); });
+
+async function processUserChat() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    chatInput.value = "";
+    appendChatBubble("USER", text, "text-cyan-400");
+    chatHistory.push({ role: "user", content: text });
+
+    const thinkingId = appendChatBubble("COACH AI", "正在翻阅运动生理学模型...", "text-purple-400 animate-pulse");
+
+    try {
+        const response = await fetch("/.netlify/functions/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                type: "free_chat",
+                messages: chatHistory
+            })
+        });
+        const data = await response.json();
+        
+        const deleteEl = document.getElementById(thinkingId);
+        if (deleteEl) deleteEl.remove();
+
+        if (data.error) {
+            appendChatBubble("SYSTEM ERROR", data.error, "text-rose-400");
+        } else {
+            appendChatBubble("COACH AI", data.content, "text-purple-400");
+            chatHistory.push({ role: "assistant", content: data.content });
+        }
+    } catch (e) {
+        const deleteEl = document.getElementById(thinkingId);
+        if (deleteEl) deleteEl.remove();
+        appendChatBubble("SYSTEM ERROR", "微服务连接失败", "text-rose-400");
+    }
+}
+
+function appendChatBubble(sender, content, colorClass) {
+    const id = "msg-node-" + Math.random().toString(36).substr(2, 4);
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = "bg-slate-900 p-3 rounded-2xl border border-slate-800/80 text-slate-200 max-w-[90%] leading-relaxed animate-fade-in";
+    div.innerHTML = `<span class="${colorClass} font-bold font-mono">${sender}:</span> ${content.replace(/\n/g, '<br>')}`;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return id;
 }
