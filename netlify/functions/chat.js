@@ -16,12 +16,14 @@ exports.handler = async (event) => {
     }
 
     try {
+        // 读取环境变量
         apiKey = process.env.API_KEY || process.env.OPENAI_API_KEY || process.env.XUNFEI_API_KEY || process.env.SPARK_API_KEY;
         apiBase = process.env.API_BASE || process.env.OPENAI_BASE_URL || process.env.XUNFEI_API_BASE || process.env.XUNFEI_BASE_URL || process.env.SPARK_API_BASE;
         modelId = process.env.MODEL_ID || process.env.OPENAI_MODEL || process.env.XUNFEI_MODEL_ID || process.env.SPARK_MODEL_ID;
 
+        // 基础验证
         if (!apiKey || !apiBase || !modelId) {
-            throw new Error("AI 配置不完整，请在 Netlify 环境变量中设置 API_KEY/OPENAI_API_KEY/XUNFEI_API_KEY、API_BASE/OPENAI_BASE_URL/XUNFEI_API_BASE 和 MODEL_ID/OPENAI_MODEL/XUNFEI_MODEL_ID。")
+            throw new Error("AI 配置不完整，请在 Netlify 环境变量中设置您的 API_KEY、API_BASE 和 MODEL_ID。")
         }
     } catch (err) {
         return {
@@ -45,7 +47,7 @@ exports.handler = async (event) => {
 
         // ================= 场景 1: 肌肉生理数据自动分析 =================
         if (type === "analyze_muscle") {
-            // 如果前端由于高频计算未完成，传过来了空 payload，提供一组默认安全兜底值，不至于让后端 500
+            // 如果前端由于高频计算未完成，传过来了空 payload，提供一组默认安全兜底值
             const size = payload ? (payload.size || "38.5") : "38.5";
             const fatigue = payload ? (payload.fatigue || "50.0") : "50.0";
             const excitement = payload ? (payload.excitement || "65.0") : "65.0";
@@ -80,11 +82,18 @@ exports.handler = async (event) => {
             ];
         }
 
-        // 3. 呼叫大模型
-        const endpoint = apiBase.includes('/chat/completions')
-            ? apiBase
-            : `${apiBase.replace(/\/$/, '')}/chat/completions`;
+        // 3. 拼接并标准化请求 Endpoint
+        const safeApiBase = apiBase || "";
+        const endpoint = safeApiBase.includes('/chat/completions')
+            ? safeApiBase
+            : `${safeApiBase.replace(/\/$/, '')}/chat/completions`;
 
+        // 环境兼容性防御检查
+        if (typeof fetch !== 'function') {
+            throw new Error("当前 Node 环境不支持原生 fetch。请在 Netlify 后台确保 NODE_VERSION 环境变量已设置为 18 或 20 以上。");
+        }
+
+        // 4. 呼叫 AI 远端接口
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -99,10 +108,19 @@ exports.handler = async (event) => {
             })
         });
 
-        const data = await response.json();
+        // 5. 健壮接收：先转成文本，防止接口非标准返回（如 502/504 报错网页）导致 JSON 解析直接炸掉
+        const responseText = await response.text();
+        let data = {};
+        try {
+            data = JSON.parse(responseText);
+        } catch(e) {
+            throw new Error(`AI 服务未返回标准的 JSON 格式。状态码: ${response.status}，原始响应截取: ${responseText.substring(0, 150)}`);
+        }
 
+        // 6. 远端业务报错拦截
         if (!response.ok || data.error) {
-            throw new Error(data.error?.message || data.error || `AI 服务返回异常，状态码: ${response.status}`);
+            const errorMsg = data.error?.message || data.error || responseText;
+            throw new Error(`AI 供应商返回异常 (状态码 ${response.status}): ${typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg}`);
         }
 
         const aiContent = data.choices?.[0]?.message?.content || data.content || '';
@@ -119,7 +137,7 @@ exports.handler = async (event) => {
         };
 
     } catch (err) {
-        // 后端真正崩溃时，捕获异常，并在日志中打印详细的调用栈
+        // 后端真正崩溃时，捕获异常并在控制台打印
         console.error("====== 后端执行异常 ======", err);
         return {
             statusCode: 500,
@@ -129,7 +147,7 @@ exports.handler = async (event) => {
             },
             body: JSON.stringify({ 
                 error: err.message,
-                stack: err.stack // 把具体的崩溃详情也带回前端控制台，方便本地联调一眼看清
+                stack: err.stack // 把具体的崩溃详情带回前端，方便联调
             })
         };
     }
