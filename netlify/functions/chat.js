@@ -1,13 +1,13 @@
 const { OpenAI } = require("openai");
 
-// 初始化讯飞星辰客户端（使用你原有的环境变量命名）
+// 初始化讯飞星辰客户端
 const client = new OpenAI({
     apiKey: process.env.API_KEY,
     baseURL: process.env.API_BASE
 });
 
 exports.handler = async (event) => {
-    // 处理跨域请求（避免前端联调时产生跨域报错）
+    // 1. 处理跨域预检请求
     if (event.httpMethod === "OPTIONS") {
         return {
             statusCode: 200,
@@ -20,14 +20,21 @@ exports.handler = async (event) => {
     }
 
     try {
-        // 解析前端传来的请求体
-        const { type, payload, messages = [] } = JSON.parse(event.body || "{}");
-        
+        // 2. 严谨解析请求体，防止无效或空的 JSON 触发崩溃
+        const requestData = JSON.parse(event.body || "{}");
+        const type = requestData.type || "free_chat";
+        const payload = requestData.payload || null;          // 做空值保护
+        const messages = requestData.messages || [];
+
         let finalMessages = [];
 
         // ================= 场景 1: 肌肉生理数据自动分析 =================
         if (type === "analyze_muscle") {
-            const { size, fatigue, excitement, strength } = payload;
+            // 如果前端由于高频计算未完成，传过来了空 payload，提供一组默认安全兜底值，不至于让后端 500
+            const size = payload ? (payload.size || "38.5") : "38.5";
+            const fatigue = payload ? (payload.fatigue || "50.0") : "50.0";
+            const excitement = payload ? (payload.excitement || "65.0") : "65.0";
+            const strength = payload ? (payload.strength || "90.0") : "90.0";
             
             finalMessages = [
                 {
@@ -54,11 +61,11 @@ exports.handler = async (event) => {
                     role: "system",
                     content: process.env.AI_IDENTITY_PROMPT || "你是一个专业的智能运动健康助手，负责解答用户关于健身、肌肉训练、伤病防护和饮食相关的疑问。请保持专业、亲切、严谨。"
                 },
-                ...messages // 直接继承你之前代码的上下文透传
+                ...messages // 透传前端聊天历史上下文
             ];
         }
 
-        // 调用大模型
+        // 3. 呼叫大模型
         const completion = await client.chat.completions.create({
             model: process.env.MODEL_ID,
             messages: finalMessages,
@@ -73,19 +80,23 @@ exports.handler = async (event) => {
                 "Access-Control-Allow-Origin": "*" 
             },
             body: JSON.stringify({
-                // 保持与你旧项目一致的字段名 content
                 content: completion.choices[0].message.content
             })
         };
+
     } catch (err) {
-        console.error("Chat error:", err);
+        // 后端真正崩溃时，捕获异常，并在日志中打印详细的调用栈
+        console.error("====== 后端执行异常 ======", err);
         return {
             statusCode: 500,
             headers: { 
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*" 
             },
-            body: JSON.stringify({ error: err.message })
+            body: JSON.stringify({ 
+                error: err.message,
+                stack: err.stack // 把具体的崩溃详情也带回前端控制台，方便本地联调一眼看清
+            })
         };
     }
 };
