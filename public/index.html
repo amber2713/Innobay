@@ -3,64 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>体征与运动数据监测系统 // DATA STREAM</title>
+    <title>多模态生理指标数据监测系统</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="style.css">
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+        /* 1Hz 独立均值图表容器 */
+        .wave-container { height: 80px; display: flex; align-items: flex-end; gap: 3px; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-900">
 
-    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex justify-between items-center">
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
         <div class="flex items-center space-x-3">
             <div class="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_10px_#06b6d4]"></div>
-            <span class="font-mono tracking-wider text-sm text-slate-400">BIOMONITOR // MULTI_STREAM_v2.5</span>
+            <span class="font-mono tracking-wider text-base text-slate-300">BIOMONITOR // Core_v3.0</span>
         </div>
-        <div id="connection-status" class="text-xs font-mono bg-slate-800 px-3 py-1 rounded-full text-rose-400 border border-rose-500/30">
-            ● 未连接设备
+        <div id="connection-status" class="text-sm font-mono bg-slate-800 px-3 py-1 rounded-full text-rose-400 border border-rose-500/30">
+            ● 硬件未连接
         </div>
     </header>
 
-    <main class="flex-1 flex flex-col items-center justify-center p-4 max-w-6xl mx-auto w-full">
+    <main class="flex-1 w-full max-w-6xl mx-auto p-4 md:p-6 flex flex-col justify-center">
         
-        <section id="step-1" class="w-full max-w-md text-center space-y-8 py-12">
+        <section id="step-1" class="w-full max-w-md mx-auto text-center space-y-8 py-12">
             <div class="relative w-40 h-40 mx-auto flex items-center justify-center">
-                <div class="absolute inset-0 rounded-full bg-cyan-500/10 border border-cyan-500/30 radar-wave"></div>
-                <div class="absolute inset-4 rounded-full bg-cyan-950 border border-cyan-500/40 flex items-center justify-center">
-                    <svg class="w-10 h-10 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="absolute inset-0 rounded-full bg-cyan-500/10 border border-cyan-500/30 animate-pulse"></div>
+                <div class="absolute inset-4 rounded-full bg-slate-900 border border-cyan-500/30 flex items-center justify-center">
+                    <svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M7.53 14.53a6 6 0 018.94 0M13 11a1 1 0 11-2 0 1 1 0 012 0zm7 2.121C19.23 6.512 15.742 3 12 3c-3.743 0-7.23 3.512-8 10.121"></path>
                     </svg>
                 </div>
             </div>
             <div class="space-y-2">
-                <h2 class="text-lg font-medium text-cyan-400">正在扫描周围肌电蓝牙外设...</h2>
-                <p class="text-xs text-slate-500 font-mono" id="search-loader">WAITING SIGNAL...</p>
+                <h2 class="text-xl font-medium text-cyan-400">正在检索肌电信号外设...</h2>
+                <p class="text-sm text-slate-500 font-mono" id="search-loader">READY TO PAIR</p>
             </div>
-            <button id="connect-btn" class="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-medium rounded-lg text-sm transition-all cursor-pointer">
-                模拟握手连接硬件
+            <button id="connect-btn" class="w-full py-3.5 bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-sm font-bold rounded-xl tracking-widest transition-all cursor-pointer">
+                开启无线物理握手
             </button>
         </section>
 
-        <section id="step-2" class="hidden w-full max-w-md space-y-6 py-8">
-            <div class="text-center space-y-1">
-                <h2 class="text-xl font-semibold">数据同步总线已就绪</h2>
-                <p class="text-slate-400 text-xs">请点击下方按钮载入核心监测大屏</p>
+        <section id="step-2" class="hidden w-full max-w-xl mx-auto space-y-6 py-6">
+            <div class="text-center space-y-2">
+                <h2 class="text-2xl font-bold">总线链路建立成功</h2>
+                <p class="text-slate-400 text-sm">信号处理方式：10Hz高频采样 ➔ 1Hz均值滚动过滤</p>
             </div>
-            <button id="btn-go-metrics" class="w-full p-6 text-left bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-xl transition-all cursor-pointer hover:shadow-xl hover:shadow-cyan-950/20 group">
-                <div class="flex justify-between items-start mb-2">
-                    <span class="text-xs font-mono text-cyan-400">METRICS STREAM // ACTIVE</span>
-                    <span class="text-[10px] text-slate-500 font-mono">CH_ALL</span>
+            
+            <div class="grid grid-cols-1 gap-4">
+                <button id="btn-goto-metrics" class="w-full p-5 text-left bg-slate-900 border border-slate-800 rounded-2xl hover:border-cyan-500/50 transition-all cursor-pointer group">
+                    <span class="text-xs font-mono text-cyan-400 block mb-1">SCENE_01 // VISUAL PANEL</span>
+                    <h3 class="text-lg font-semibold text-slate-200 group-hover:text-cyan-400 transition-colors">进入 1Hz 均值多轨数据流大屏</h3>
+                    <p class="text-sm text-slate-400 mt-1">每个肌肉特征板块内部独立包含专属它的数据流波动图。在电脑端并排网格显示，手机端自动适配为竖向单列顺次排列。</p>
+                </button>
+
+                <button id="btn-goto-chat" class="w-full p-5 text-left bg-slate-900 border border-slate-800 rounded-2xl hover:border-purple-500/50 transition-all cursor-pointer group">
+                    <span class="text-xs font-mono text-purple-400 block mb-1">SCENE_02 // AI COACH</span>
+                    <h3 class="text-lg font-semibold text-slate-200 group-hover:text-purple-400 transition-colors">进入 AI 智能私教自由对话舱</h3>
+                    <p class="text-sm text-slate-400 mt-1">完全隐藏复杂波形图表，可随时同步传输硬件特征至云端，与星火大模型直接进行自由沟通。</p>
+                </button>
+            </div>
+        </section>
+
+        <section id="step-3-metrics" class="hidden w-full space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <button class="back-to-hub text-sm text-slate-400 hover:text-cyan-400 font-mono transition-colors">&larr; 返回控制中心</button>
+                <button id="btn-sync-data-metrics" class="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold tracking-wider shadow-md transition-all cursor-pointer">
+                    ✦ 发送当前均值包至星火AI
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-baseline">
+                        <span class="text-base font-semibold text-slate-300">① 肌肉力量 (Strength)</span>
+                        <span class="font-mono text-2xl font-bold text-cyan-400"><span id="stream-val-strength">0.0</span> <span class="text-xs text-slate-500">N</span></span>
+                    </div>
+                    <div class="wave-container" id="container-wave-strength"></div>
+                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
                 </div>
-                <h3 class="text-md font-medium text-slate-200 group-hover:text-cyan-400 transition-colors">进入多模态实时数据看板</h3>
-                <p class="text-xs text-slate-400 mt-1">同步加载肌肉大小、力量输出、兴奋度及疲劳指标流。</p>
-            </button>
+
+                <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-baseline">
+                        <span class="text-base font-semibold text-slate-300">② 肌肉疲劳度 (Fatigue)</span>
+                        <span class="font-mono text-2xl font-bold text-emerald-400"><span id="stream-val-fatigue">0.0</span> <span class="text-xs text-slate-500">%</span></span>
+                    </div>
+                    <div class="wave-container" id="container-wave-fatigue"></div>
+                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                </div>
+
+                <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-baseline">
+                        <span class="text-base font-semibold text-slate-300">③ 兴奋程度 (Excitement)</span>
+                        <span class="font-mono text-2xl font-bold text-amber-400"><span id="stream-val-excitement">0.0</span> <span class="text-xs text-slate-500">%</span></span>
+                    </div>
+                    <div class="wave-container" id="container-wave-excitement"></div>
+                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                </div>
+
+                <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex justify-between items-baseline">
+                        <span class="text-base font-semibold text-slate-300">④ 肌肉大小/围度 (Size)</span>
+                        <span class="font-mono text-2xl font-bold text-purple-400"><span id="stream-val-size">0.0</span> <span class="text-xs text-slate-500">cm</span></span>
+                    </div>
+                    <div class="wave-container" id="container-wave-size"></div>
+                    <div class="text-right text-xs font-mono text-slate-600">1Hz Data Flow (10-Frame Avg)</div>
+                </div>
+            </div>
+
+            <div id="panel-metrics-ai" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2 hidden">
+                <div class="text-sm font-mono text-purple-400 font-bold border-b border-slate-800 pb-2 flex items-center space-x-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                    <span>星火即时体征处方建议：</span>
+                </div>
+                <div id="metrics-ai-content" class="text-slate-200 leading-relaxed text-sm max-h-60 overflow-y-auto custom-scrollbar"></div>
+            </div>
         </section>
 
-        <section id="step-3" class="hidden w-full space-y-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-3">
-                <div>
+        <section id="step-4-chat" class="hidden w-full max-w-2xl mx-auto flex flex-col h-[75vh] space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <button class="back-to-hub text-sm text-slate-400 hover:text-cyan-400 font-mono transition-colors">&larr; 返回控制中心</button>
+                <button id="btn-sync-data-chat" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-mono transition-all cursor-pointer">
+                    传输肌肉信息
+                </button>
+            </div>
+
+            <div id="chat-sync-tip" class="bg-slate-900/60 border border-slate-800/60 px-4 py-3 rounded-xl text-xs text-slate-400 font-mono leading-relaxed">
+                [SYSTEM]: 暂未点击右上角同步生理数据。你可以直接往下对话，或点击上方“传输肌肉信息”获取设备的硬件特征包。
+            </div>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 text-sm">
+                <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 max-w-[85%] leading-relaxed">
+                    <span class="text-purple-400 font-bold font-mono">COACH AI:</span> 欢迎进入专属对话交互舱。当前硬件图表已隐藏，你可以随时针对你的长期训练方向或身体恢复状态向我提问。
+                </div>
+            </div>
+
+            <div class="flex space-x-2">
+                <input id="chat-input" type="text" placeholder="向 AI 智能教练提问..." class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500 text-slate-200">
+                <button id="chat-send-btn" class="px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-medium transition-all cursor-pointer">发送</button>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="style.js"></script>
+</body>
+</html>                <div>
                     <button id="back-btn" class="text-xs font-mono text-slate-500 hover:text-cyan-400 flex items-center space-x-1 cursor-pointer">
                         <span>&larr; 返回控制中心</span>
                     </button>
