@@ -344,3 +344,146 @@ function appendChatBubble(sender, content, colorClass) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
     return id;
 }
+// public/style.js 
+
+// ... 前面原有的状态机、缓冲区、队列定义保持原样 ...
+
+// ==================== 新增：第三功能核心历史静态特征库 ====================
+const PRESET_HISTORY_SIZE = [37.8, 38.0, 38.3, 38.2]; // 前4天固定的肌肉围度数据 (cm)
+
+// DOM 获取追加
+const btnGotoHistory = document.getElementById('btn-goto-history');
+const historyTodayVal = document.getElementById('history-today-val');
+const historyChartContainer = document.getElementById('history-chart-container');
+const btnSyncHistoryAi = document.getElementById('btn-sync-history-ai');
+const panelHistoryAi = document.getElementById('panel-history-ai');
+const historyAiContent = document.getElementById('history-ai-content');
+
+
+// 在原本的 switchStep(step) 函数中，将新 Section 纳入显示/隐藏管理：
+function switchStep(step) {
+    currentStep = step;
+    document.getElementById('step-1').classList.add('hidden');
+    document.getElementById('step-2').classList.add('hidden');
+    document.getElementById('step-3-metrics').classList.add('hidden');
+    document.getElementById('step-4-chat').classList.add('hidden');
+    document.getElementById('step-5-history').classList.add('hidden'); // 新增
+
+    if (step === 3) document.getElementById('step-3-metrics').classList.remove('hidden');
+    else if (step === 4) document.getElementById('step-4-chat').classList.remove('hidden');
+    else if (step === 5) document.getElementById('step-5-history').classList.remove('hidden'); // 新增
+    else document.getElementById(`step-${step}`).classList.remove('hidden');
+
+    // 只要不是去数据大屏，就关掉高频物理刷新，防止浪费开销
+    if (step !== 3 && step !== 5) { 
+        clearInterval(samplingTimer);
+    }
+}
+
+// 绑定第三个入口按钮的点击事件
+if (btnGotoHistory) {
+    btnGotoHistory.addEventListener('click', () => {
+        switchStep(5);
+        
+        // 如果当前完全没跑过图表大屏（没有均值），则依据当前轮询状态机强行生成一个今日均值，防止显示0
+        if (latestAveragedMetrics.size === 0) {
+            const staticFrame = generateRawHardwareFrame();
+            latestAveragedMetrics.size = staticFrame.size;
+            latestAveragedMetrics.fatigue = staticFrame.fatigue;
+            latestAveragedMetrics.strength = staticFrame.strength;
+            latestAveragedMetrics.excitement = staticFrame.excitement;
+        }
+        
+        // 渲染5日大屏
+        refreshHistoryTrendScreen();
+    });
+}
+
+// 渲染5日纵向对比图表引擎
+function refreshHistoryTrendScreen() {
+    if (!historyTodayVal || !historyChartContainer) return;
+
+    const currentTodaySize = latestAveragedMetrics.size > 0 ? latestAveragedMetrics.size : 38.5;
+    historyTodayVal.innerText = currentTodaySize.toFixed(1);
+
+    // 组合前4天与今天，构成完整5天序列
+    const fiveDaysData = [...PRESET_HISTORY_SIZE, currentTodaySize];
+    
+    // 清空画布并重新构建柱体 HTML
+    historyChartContainer.innerHTML = '';
+    
+    const maxVal = Math.max(...fiveDaysData, 40);
+    const minVal = Math.min(...fiveDaysData, 35) * 0.98; // 动态拉高视差
+
+    fiveDaysData.forEach((val, index) => {
+        const heightPercent = ((val - minVal) / (maxVal - minVal)) * 80 + 20; // 保证最低高度
+        
+        // 创建外层对齐容器
+        const barWrapper = document.createElement('div');
+        barWrapper.className = "flex-1 flex flex-col justify-end items-center h-full relative group";
+        
+        // 创建内部柱状图形
+        const bar = document.createElement('div');
+        bar.style.height = `${heightPercent}%`;
+        
+        // 第5天(今天)高亮着色，前4天灰色暗调科技感
+        if (index === 4) {
+            bar.className = "w-full bg-gradient-to-t from-amber-600 to-amber-400 rounded-t shadow-[0_0_12px_rgba(245,158,11,0.4)] transition-all duration-500";
+        } else {
+            bar.className = "w-full bg-slate-800 border border-slate-700/60 rounded-t hover:bg-slate-700 transition-all duration-300";
+        }
+        
+        // 浮动悬停大字数值提示
+        const tooltip = document.createElement('span');
+        tooltip.className = "absolute -top-6 text-[10px] font-mono text-slate-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-slate-950 px-1 rounded border border-slate-800";
+        tooltip.innerText = `${val.toFixed(1)}cm`;
+
+        barWrapper.appendChild(tooltip);
+        barWrapper.appendChild(bar);
+        historyChartContainer.appendChild(barWrapper);
+    });
+}
+
+// 触发第三功能：5日纵向对比诊断 AI 提问请求
+if (btnSyncHistoryAi) {
+    btnSyncHistoryAi.addEventListener('click', async () => {
+        panelHistoryAi.classList.remove('hidden');
+        btnSyncHistoryAi.disabled = true;
+        const oldText = btnSyncHistoryAi.innerText;
+        btnSyncHistoryAi.innerText = "正在打包纵向分析轴...";
+
+        historyAiContent.innerHTML = `<span class="text-amber-400 font-mono animate-pulse">正在提取[D1-D4]历史围度快照并合并今日1Hz均值，正在向讯飞星辰请求周期健康建议...</span>`;
+
+        const currentTodaySize = latestAveragedMetrics.size > 0 ? latestAveragedMetrics.size.toFixed(1) : "38.5";
+
+        // 构建符合纵向对比背景的 Payload 包传给后台
+        const payloadData = {
+            history_sizes: PRESET_HISTORY_SIZE, // [37.8, 38.0, 38.3, 38.2]
+            today_size: currentTodaySize,
+            today_fatigue: latestAveragedMetrics.fatigue > 0 ? latestAveragedMetrics.fatigue.toFixed(1) : "50.0",
+            today_strength: latestAveragedMetrics.strength > 0 ? latestAveragedMetrics.strength.toFixed(1) : "90.0"
+        };
+
+        try {
+            const response = await fetch("/.netlify/functions/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: "analyze_trend", // 专门给云端识别的处理逻辑类型
+                    payload: payloadData
+                })
+            });
+            const data = await response.json();
+            if (data.error) {
+                historyAiContent.innerHTML = `<span class="text-rose-400">纵向链诊断失败: ${data.error}</span>`;
+            } else {
+                historyAiContent.innerHTML = data.content.replace(/\n/g, '<br>');
+            }
+        } catch (err) {
+            historyAiContent.innerHTML = `<span class="text-rose-400">微服务未响应，请检查云端端点配置。</span>`;
+        } finally {
+            btnSyncHistoryAi.disabled = false;
+            btnSyncHistoryAi.innerText = oldText;
+        }
+    });
+}
