@@ -35,7 +35,7 @@ exports.handler = async (event) => {
             const excitement = payload ? (payload.excitement || "65.0") : "65.0";
             const strength = payload ? (payload.strength || "90.0") : "90.0";
             
-            // 特别注意：这里直接使用 user 角色，把教练指令和数据合并，完美避开星火对 system 角色的引擎报错
+            // 规避星火大模型对 system 角色的引擎报错，直接注入 user 
             finalMessages = [
                 {
                     role: "user",
@@ -53,6 +53,27 @@ exports.handler = async (event) => {
                 }
             ];
         } 
+        // ================= 场景 3 (新增): 5日肌肉围度纵向复盘 =================
+        else if (type === "analyze_trend") {
+            const historySizes = payload && payload.history_sizes ? payload.history_sizes : [37.8, 38.0, 38.3, 38.2];
+            const todaySize = payload ? (payload.today_size || "38.5") : "38.5";
+            const todayFatigue = payload ? (payload.today_fatigue || "50.0") : "50.0";
+            const todayStrength = payload ? (payload.today_strength || "90.0") : "90.0";
+
+            finalMessages = [
+                {
+                    role: "user",
+                    content: `【专家纵向诊断指令】
+你是一个高级运动生理学专家与超量恢复（Supercompensation）评定顾问。
+请针对用户提供的【5日肌肉围度演变趋势】以及【今日实时体征】，进行深度的多周期纵向对比分析。
+
+你的回答应当包含以下模块（使用清晰的排版）：
+1. 【趋势评定】：明确判断用户当前的肌肉状态是属于【高效充血期】、【超量恢复生长期】、【疲劳水肿期】还是【增肌平台期】。
+2. 【数据交叉比对】：结合前4天的历史围度 [${historySizes.join("cm, ")}cm] 与今天的最新围度 ${todaySize}cm，同时参考今日肌电输出力量（${todayStrength}N）与疲劳度（${todayFatigue}%），解释产生该趋势的深层生理学逻辑。
+3. 【周期性策略调整】：针对接下来的 48-72 小时，给出精确的训练强度调整（如：是否引入 De-load 减量周、维持原计划还是寻求极限突破）与饮食营养补充策略。`
+                }
+            ];
+        }
         // ================= 场景 2: 自由 AI 问答交互 =================
         else {
             finalMessages = [
