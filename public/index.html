@@ -62,6 +62,53 @@
                     <h3 class="text-lg font-semibold text-slate-200 group-hover:text-purple-400 transition-colors">进入 AI 智能私教自由对话舱</h3>
                     <p class="text-sm text-slate-400 mt-1">完全隐藏复杂波形图，基于同步传输进云端的硬件特征数据，与星火大模型自由沟通。</p>
                 </button>
+
+                <button id="btn-goto-history" class="w-full p-5 text-left bg-slate-900 border border-slate-800 rounded-2xl hover:border-amber-500/50 transition-all cursor-pointer group">
+                    <span class="text-xs font-mono text-amber-400 block mb-1">SCENE_03 // TREND ANALYSIS</span>
+                    <h3 class="text-lg font-semibold text-slate-200 group-hover:text-amber-400 transition-colors">进入 5日肌肉围度纵向复盘舱</h3>
+                    <p class="text-sm text-slate-400 mt-1">结合前4天既定历史特征与今日实时测量均值，建立多日增长交叉对比图谱并获取AI调整建议。</p>
+                </button>
+            </div>
+        </section>
+
+        <section id="step-5-history" class="hidden w-full max-w-2xl mx-auto space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <button class="back-to-hub text-sm text-slate-400 hover:text-cyan-400 font-mono transition-colors">&larr; 返回控制中心</button>
+                <button id="btn-sync-history-ai" class="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl text-xs font-bold tracking-wider shadow-md transition-all cursor-pointer">
+                    ⚡ 生成5日纵向对比AI发展建议
+                </button>
+            </div>
+
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-200">5日肌肉围度演变趋势 (Size Comparison)</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">历史4天预置基准 ➔ 今日实时动态均值</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-slate-400 font-mono block">今日当前均值</span>
+                        <span class="font-mono text-xl font-bold text-amber-400"><span id="history-today-val">0.0</span> cm</span>
+                    </div>
+                </div>
+
+                <div class="height-[120px] flex items-flex-end justify-between gap-4 pt-4 px-2 border-b border-slate-800" style="height: 140px;" id="history-chart-container">
+                    </div>
+                
+                <div class="flex justify-between text-[11px] font-mono text-slate-500 px-1">
+                    <span>Day 1</span>
+                    <span>Day 2</span>
+                    <span>Day 3</span>
+                    <span>Day 4</span>
+                    <span class="text-amber-400 font-bold">Day 5 (今天)</span>
+                </div>
+            </div>
+
+            <div id="panel-history-ai" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2 hidden">
+                <div class="text-sm font-mono text-amber-400 font-bold border-b border-slate-800 pb-2 flex items-center space-x-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                    <span>星火大模型 5日多周期纵向评定方案：</span>
+                </div>
+                <div id="history-ai-content" class="text-slate-200 leading-relaxed text-sm max-h-60 overflow-y-auto custom-scrollbar"></div>
             </div>
         </section>
 
